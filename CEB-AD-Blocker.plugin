@@ -1,0 +1,30 @@
+#!name = 光大银行广告屏蔽
+#!desc = Loon 纯 JS 过滤：改写光大银行 App 配置响应，清空开屏广告 / 首页弹窗 / 主视图公告下方推广内容，不拦截功能域名
+#!author = WorkBuddy
+#!homepage = https://github.com/aoconch/cebbank-ad-blocker-loon
+#!tag = 去广告, 光大银行
+#!type = normal
+
+# ============================================================
+# 策略（v1）
+#   不拦截 static.cebbank.com —— 该域承载 App 全部原生配置与图片，
+#   粗暴 REJECT 会导致功能卡片缺失。仅通过 [Script] http-response
+#   改写布局配置 JSON：
+#     · KPPage.json 的 ClientNoticeList（开屏广告）→ 清空广告条目
+#     · KPPage.json 的 HomePopList（首页弹窗广告）→ 清空广告条目
+#   [Rule] 仅拦截埋点 / 统计域 datafinder.cebbank.com。
+# ============================================================
+
+[Rule]
+# 埋点 / 数据统计（不影响功能）
+DOMAIN,datafinder.cebbank.com,REJECT
+
+[Mitm]
+hostname = static.cebbank.com
+
+[Script]
+# 首页布局配置：开屏广告 ClientNoticeList + 首页弹窗 HomePopList
+http-response ^https?:\/\/static\.cebbank\.com\/fileDir\/subject\/resource\/cembpublished\/.*\/clients\/layouts\/KPPage\.json(\?.*)?$ script-path=https://raw.githubusercontent.com/aoconch/cebbank-ad-blocker-loon/main/cebbank_remove_ads.js,requires-body=true,timeout=20,tag=光大去广告(开屏/弹窗),enable=true
+
+# 兜底：其余 layouts 下 Page 级 JSON 配置也过一遍脚本（无广告则原样放行）
+http-response ^https?:\/\/static\.cebbank\.com\/fileDir\/subject\/resource\/cembpublished\/.*\/clients\/layouts\/.*Page\.json(\?.*)?$ script-path=https://raw.githubusercontent.com/aoconch/cebbank-ad-blocker-loon/main/cebbank_remove_ads.js,requires-body=true,timeout=20,tag=光大去广告(布局兜底),enable=true
