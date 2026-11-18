@@ -6,18 +6,33 @@
 #!type = normal
 
 # ============================================================
-# 策略（v1）
+# 策略（v2，2026-11-16）
 #   不拦截 static.cebbank.com —— 该域承载 App 全部原生配置与图片，
 #   粗暴 REJECT 会导致功能卡片缺失。仅通过 [Script] http-response
 #   改写布局配置 JSON：
 #     · KPPage.json 的 ClientNoticeList（开屏广告）→ 清空广告条目
 #     · KPPage.json 的 HomePopList（首页弹窗广告）→ 清空广告条目
-#   [Rule] 仅拦截埋点 / 统计域 datafinder.cebbank.com。
+#   [Rule] 埋点 / 统计域 datafinder.cebbank.com 用 Loon 原生
+#     REJECT-DICT-NO-DROP（strings_Loon.txt:14416-14417 词表）返回 200 `{}`，
+#     不再走普通 REJECT 的 30s/10 次 DROP 升级 —— 真机该域被 REJECT 77~131 次后
+#     连接延迟关闭，App 侧报「网络问题/功能卡片缺失」。NO-DROP 变体只回空响应体、
+#     不断连（PolicyDecision.swift:26-29 的同语义注释）。
 # ============================================================
+
+# ============================================================
+# v3 (2026-11-18) 开屏广告图前置拦截：
+#   脚本改 KPPage.json 的 advertImg 为空，但 App 在脚本改写前 ~30s
+#   已从缓存/旧配置请求开屏图(tunnel-diag 23:41:33 sjyh* vs 23:42:02 H2-SCRIPT)。
+#   这里在图片请求层直接回 1x1 透明 GIF，绕开时序问题。
+#   只匹配 sjyh* 前缀(= KPPage ClientNoticeList 的开屏广告图)，
+#   HomePageImg 下 YLZQ/life/bank/baox/zhib/... 等为功能入口图标，不拦截。
+# ============================================================
+[Rewrite]
+^https?:\/\/static\.cebbank\.com\/fileDir\/subject\/resource\/cembpublished\/.*\/HomePageImg\/sjyh[^/]*\.(png|jpe?g) - reject-img
 
 [Rule]
 # 埋点 / 数据统计（不影响功能）
-DOMAIN,datafinder.cebbank.com,REJECT
+DOMAIN,datafinder.cebbank.com,REJECT-DICT-NO-DROP
 
 [Mitm]
 hostname = static.cebbank.com
